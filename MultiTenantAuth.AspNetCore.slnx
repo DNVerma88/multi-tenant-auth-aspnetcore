@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/samples/">
+    <Project Path="samples/ApiOnlySample/ApiOnlySample.csproj" />
+    <Project Path="samples/MinimalApiSample/MinimalApiSample.csproj" />
+    <Project Path="samples/SubdomainTenantSample/SubdomainTenantSample.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/MultiTenantAuth.AspNetCore/MultiTenantAuth.AspNetCore.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/MultiTenantAuth.AspNetCore.Tests/MultiTenantAuth.AspNetCore.Tests.csproj" />
+  </Folder>
+</Solution>

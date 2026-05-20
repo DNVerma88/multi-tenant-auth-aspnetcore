@@ -1,0 +1,35 @@
+version: 2
+
+updates:
+  # Keep NuGet packages up to date
+  - package-ecosystem: "nuget"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+    open-pull-requests-limit: 10
+    groups:
+      microsoft-extensions:
+        patterns:
+          - "Microsoft.Extensions.*"
+          - "Microsoft.AspNetCore.*"
+      sourcelink:
+        patterns:
+          - "Microsoft.SourceLink.*"
+          - "Microsoft.Build.Tasks.Git"
+    labels:
+      - "dependencies"
+      - "nuget"
+
+  # Keep GitHub Actions up to date
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"

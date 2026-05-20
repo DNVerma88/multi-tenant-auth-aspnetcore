@@ -1,0 +1,13 @@
+C:\GitRepos\multi-tenant-auth-aspnetcore\src\MultiTenantAuth.AspNetCore\obj\Release\net10.0\MultiTenantAuth.AspNetCore.GeneratedMSBuildEditorConfig.editorconfig
+C:\GitRepos\multi-tenant-auth-aspnetcore\src\MultiTenantAuth.AspNetCore\obj\Release\net10.0\MultiTenantAuth.AspNetCore.AssemblyInfoInputs.cache
+C:\GitRepos\multi-tenant-auth-aspnetcore\src\MultiTenantAuth.AspNetCore\obj\Release\net10.0\MultiTenantAuth.AspNetCore.AssemblyInfo.cs
+C:\GitRepos\multi-tenant-auth-aspnetcore\src\MultiTenantAuth.AspNetCore\obj\Release\net10.0\MultiTenantAuth.AspNetCore.csproj.CoreCompileInputs.cache
+C:\GitRepos\multi-tenant-auth-aspnetcore\src\MultiTenantAuth.AspNetCore\obj\Release\net10.0\MultiTenantAuth.AspNetCore.xml
+C:\GitRepos\multi-tenant-auth-aspnetcore\src\MultiTenantAuth.AspNetCore\bin\Release\net10.0\MultiTenantAuth.AspNetCore.deps.json
+C:\GitRepos\multi-tenant-auth-aspnetcore\src\MultiTenantAuth.AspNetCore\bin\Release\net10.0\MultiTenantAuth.AspNetCore.dll
+C:\GitRepos\multi-tenant-auth-aspnetcore\src\MultiTenantAuth.AspNetCore\bin\Release\net10.0\MultiTenantAuth.AspNetCore.pdb
+C:\GitRepos\multi-tenant-auth-aspnetcore\src\MultiTenantAuth.AspNetCore\bin\Release\net10.0\MultiTenantAuth.AspNetCore.xml
+C:\GitRepos\multi-tenant-auth-aspnetcore\src\MultiTenantAuth.AspNetCore\obj\Release\net10.0\MultiTenantAuth.AspNetCore.dll
+C:\GitRepos\multi-tenant-auth-aspnetcore\src\MultiTenantAuth.AspNetCore\obj\Release\net10.0\refint\MultiTenantAuth.AspNetCore.dll
+C:\GitRepos\multi-tenant-auth-aspnetcore\src\MultiTenantAuth.AspNetCore\obj\Release\net10.0\MultiTenantAuth.AspNetCore.pdb
+C:\GitRepos\multi-tenant-auth-aspnetcore\src\MultiTenantAuth.AspNetCore\obj\Release\net10.0\ref\MultiTenantAuth.AspNetCore.dll
