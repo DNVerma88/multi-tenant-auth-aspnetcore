@@ -13,7 +13,7 @@
 
     <!-- Package Metadata -->
     <PackageId>MultiTenantAuth.AspNetCore</PackageId>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <Authors>MultiTenantAuth Contributors</Authors>
     <Description>Lightweight, production-ready multi-tenant authentication and authorization middleware for ASP.NET Core. Resolve tenant context from subdomain, header, route, claim, or custom strategies. Enforce tenant-aware access control in SaaS applications.</Description>
     <PackageTags>aspnetcore;middleware;multitenant;multi-tenancy;authentication;authorization;saas;tenant</PackageTags>

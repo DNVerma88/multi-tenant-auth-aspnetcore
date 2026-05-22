@@ -20,6 +20,9 @@ public static class TenantConstants
     /// <summary>Default claim type that lists all tenants a user is allowed to access.</summary>
     public const string DefaultAllowedTenantsClaimType = "allowed_tenants";
 
+    /// <summary>Minimum allowed length for a tenant identifier.</summary>
+    public const int DefaultMinTenantIdLength = 2;
+
     /// <summary>Maximum allowed length for a tenant identifier.</summary>
     public const int DefaultMaxTenantIdLength = 64;
 

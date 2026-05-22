@@ -41,6 +41,29 @@ public sealed class MultiTenantAuthMiddleware
         _next = next;
         _options = options.Value;
         _logger = logger;
+
+        WarnIfInsecureConfiguration();
+    }
+
+    private void WarnIfInsecureConfiguration()
+    {
+        if (!_options.RequireAuthenticatedUser)
+            _logger.LogWarning(
+                "MultiTenantAuth: {Setting} is disabled. All requests will pass " +
+                "through without authentication checks. Do NOT use this in production.",
+                nameof(_options.RequireAuthenticatedUser));
+
+        if (!_options.RequireResolvedTenant)
+            _logger.LogWarning(
+                "MultiTenantAuth: {Setting} is disabled. Requests without a " +
+                "resolvable tenant will proceed. Ensure downstream code handles null tenant context.",
+                nameof(_options.RequireResolvedTenant));
+
+        if (_options.EnableQueryStringResolution)
+            _logger.LogWarning(
+                "MultiTenantAuth: {Setting} is enabled. Query-string tenant values " +
+                "are easily manipulated. Ensure additional protections are in place.",
+                nameof(_options.EnableQueryStringResolution));
     }
 
     /// <summary>Processes the request.</summary>
@@ -83,6 +106,20 @@ public sealed class MultiTenantAuthMiddleware
 
         var tenant = resolutionResult.Tenant;
 
+        // --- Normalise tenant ID to prevent case-confusion attacks ---
+        if (_options.NormalizeTenantIdToLowercase
+            && !string.IsNullOrEmpty(tenant.TenantId)
+            && tenant.TenantId != tenant.TenantId.ToLowerInvariant())
+        {
+            tenant = new TenantContext
+            {
+                TenantId = tenant.TenantId.ToLowerInvariant(),
+                TenantSlug = tenant.TenantSlug?.ToLowerInvariant(),
+                Source = tenant.Source,
+                IsResolved = tenant.IsResolved
+            };
+        }
+
         // --- Format validation ---
         if (!TenantFormatValidator.IsValid(tenant.TenantId, _options))
         {
@@ -102,25 +139,31 @@ public sealed class MultiTenantAuthMiddleware
         // --- Store context ---
         tenantContextAccessor.Current = tenant;
 
-        // --- Validation ---
-        var validator = GetValidator(serviceProvider);
-        var validationResult = await validator.ValidateAsync(
-            tenant, context.User, context, context.RequestAborted);
-
-        if (!validationResult.Succeeded)
+        try
         {
-            _logger.LogWarning("Tenant validation failed. Reason (internal): {Reason}",
-                validationResult.FailureReason);
+            // --- Validation ---
+            var validator = GetValidator(serviceProvider);
+            var validationResult = await validator.ValidateAsync(
+                tenant, context.User, context, context.RequestAborted);
 
-            context.Response.StatusCode =
-                validationResult.StatusCode ?? StatusCodes.Status403Forbidden;
-            return;
+            if (!validationResult.Succeeded)
+            {
+                _logger.LogWarning("Tenant validation failed. Reason (internal): {Reason}",
+                    validationResult.FailureReason);
+
+                context.Response.StatusCode =
+                    validationResult.StatusCode ?? StatusCodes.Status403Forbidden;
+                return;
+            }
+
+            await _next(context);
         }
-
-        await _next(context);
-
-        // Clear context after response to prevent cross-context leakage.
-        tenantContextAccessor.Current = null;
+        finally
+        {
+            // Always clear context — on success, failure, or exception — to prevent
+            // any downstream middleware or error handler from observing a stale tenant.
+            tenantContextAccessor.Current = null;
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -150,22 +193,28 @@ public sealed class MultiTenantAuthMiddleware
 
     private ITenantResolver? GetResolver(TenantResolutionStrategy strategy, IServiceProvider sp)
     {
-        return strategy switch
+        switch (strategy)
         {
-            TenantResolutionStrategy.Header =>
-                new HeaderTenantResolver(Microsoft.Extensions.Options.Options.Create(_options)),
-            TenantResolutionStrategy.RouteValue =>
-                new RouteValueTenantResolver(Microsoft.Extensions.Options.Options.Create(_options)),
-            TenantResolutionStrategy.Subdomain =>
-                new SubdomainTenantResolver(Microsoft.Extensions.Options.Options.Create(_options)),
-            TenantResolutionStrategy.Claim =>
-                new ClaimTenantResolver(Microsoft.Extensions.Options.Options.Create(_options)),
-            TenantResolutionStrategy.QueryString =>
-                new QueryStringTenantResolver(Microsoft.Extensions.Options.Options.Create(_options)),
-            TenantResolutionStrategy.Custom =>
-                ResolveCustomResolver(sp),
-            _ => null
-        };
+            case TenantResolutionStrategy.Header:
+                return new HeaderTenantResolver(Microsoft.Extensions.Options.Options.Create(_options));
+            case TenantResolutionStrategy.RouteValue:
+                return new RouteValueTenantResolver(Microsoft.Extensions.Options.Options.Create(_options));
+            case TenantResolutionStrategy.Subdomain:
+                return new SubdomainTenantResolver(Microsoft.Extensions.Options.Options.Create(_options));
+            case TenantResolutionStrategy.Claim:
+                return new ClaimTenantResolver(Microsoft.Extensions.Options.Options.Create(_options));
+            case TenantResolutionStrategy.QueryString:
+                return new QueryStringTenantResolver(Microsoft.Extensions.Options.Options.Create(_options));
+            case TenantResolutionStrategy.Custom:
+                return ResolveCustomResolver(sp);
+            case TenantResolutionStrategy.None:
+                return null;  // Explicit no-op; callers skip null resolvers.
+            default:
+                _logger.LogWarning(
+                    "Unknown TenantResolutionStrategy value {Strategy} in ResolutionOrder — skipping.",
+                    strategy);
+                return null;
+        }
     }
 
     private ITenantResolver? ResolveCustomResolver(IServiceProvider sp)
@@ -173,9 +222,16 @@ public sealed class MultiTenantAuthMiddleware
         if (_options.CustomResolverType is null)
             return null;
 
-        // Try the exact registered type first, then fall back to ITenantResolver.
-        return (sp.GetService(_options.CustomResolverType) as ITenantResolver)
-            ?? sp.GetService<ITenantResolver>();
+        // Resolve only the exact registered type — no silent fallback to a different
+        // ITenantResolver, which could lead to the wrong resolver being invoked.
+        var resolver = sp.GetService(_options.CustomResolverType) as ITenantResolver;
+        if (resolver is null)
+            _logger.LogWarning(
+                "CustomResolverType '{Type}' is not registered in DI. " +
+                "Register it with services.AddSingleton<{TypeShort}>(...).",
+                _options.CustomResolverType.FullName,
+                _options.CustomResolverType.Name);
+        return resolver;
     }
 
     private ITenantValidator GetValidator(IServiceProvider sp)

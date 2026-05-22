@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 using MultiTenantAuth.AspNetCore.Abstractions;
@@ -28,10 +29,15 @@ internal sealed class SubdomainTenantResolver : ITenantResolver
 
         var host = context.Request.Host.Host;
 
-        // Reject IP addresses and single-label hostnames (localhost, etc.)
+        // Reject empty hosts.
         if (string.IsNullOrEmpty(host))
             return new(TenantResolutionResult.Fail("Empty host."));
 
+        // Reject IP addresses (IPv4 and IPv6) — they have no meaningful subdomain.
+        if (IPAddress.TryParse(host, out _))
+            return new(TenantResolutionResult.Fail("Host is an IP address; no subdomain to extract."));
+
+        // Reject single-label hostnames (e.g. localhost).
         var dotIndex = host.IndexOf('.', StringComparison.Ordinal);
         if (dotIndex <= 0)
             return new(TenantResolutionResult.Fail("Host has no subdomain."));

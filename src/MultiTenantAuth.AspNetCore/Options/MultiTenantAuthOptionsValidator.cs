@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Options;
+using MultiTenantAuth.AspNetCore.Abstractions;
 
 namespace MultiTenantAuth.AspNetCore.Options;
 
@@ -14,8 +15,14 @@ internal sealed class MultiTenantAuthOptionsValidator : IValidateOptions<MultiTe
     {
         var failures = new List<string>();
 
+        if (options.MinTenantIdLength <= 0)
+            failures.Add($"{nameof(options.MinTenantIdLength)} must be greater than zero.");
+
         if (options.MaxTenantIdLength <= 0)
             failures.Add($"{nameof(options.MaxTenantIdLength)} must be greater than zero.");
+
+        if (options.MinTenantIdLength > options.MaxTenantIdLength)
+            failures.Add($"{nameof(options.MinTenantIdLength)} ({options.MinTenantIdLength}) must not exceed {nameof(options.MaxTenantIdLength)} ({options.MaxTenantIdLength}).");
 
         if (options.MaxTenantSlugLength <= 0)
             failures.Add($"{nameof(options.MaxTenantSlugLength)} must be greater than zero.");
@@ -29,8 +36,25 @@ internal sealed class MultiTenantAuthOptionsValidator : IValidateOptions<MultiTe
         if (string.IsNullOrWhiteSpace(options.TenantClaimType))
             failures.Add($"{nameof(options.TenantClaimType)} must not be null or whitespace.");
 
+        if (string.IsNullOrWhiteSpace(options.TenantQueryStringName))
+            failures.Add($"{nameof(options.TenantQueryStringName)} must not be null or whitespace.");
+
         if (string.IsNullOrWhiteSpace(options.AllowedTenantsClaimType))
             failures.Add($"{nameof(options.AllowedTenantsClaimType)} must not be null or whitespace.");
+
+        if (options.CustomResolverType is not null
+            && !typeof(ITenantResolver).IsAssignableFrom(options.CustomResolverType))
+        {
+            failures.Add($"{nameof(options.CustomResolverType)} '{options.CustomResolverType.FullName}' " +
+                         $"must implement {nameof(ITenantResolver)}.");
+        }
+
+        if (options.CustomValidatorType is not null
+            && !typeof(ITenantValidator).IsAssignableFrom(options.CustomValidatorType))
+        {
+            failures.Add($"{nameof(options.CustomValidatorType)} '{options.CustomValidatorType.FullName}' " +
+                         $"must implement {nameof(ITenantValidator)}.");
+        }
 
         if (options.AllowedTenantPattern is not null)
         {
