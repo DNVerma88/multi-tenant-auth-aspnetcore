@@ -65,7 +65,7 @@ public sealed class MultiTenantAuthMiddleware
         {
             if (_options.RequireResolvedTenant)
             {
-                _logger.LogInformation("Tenant resolution failed. Reason (internal): {Reason}",
+                _logger.LogWarning("Tenant resolution failed. Reason (internal): {Reason}",
                     resolutionResult.FailureReason);
 
                 var statusCode = _options.ReturnNotFoundForUnknownTenant
@@ -86,7 +86,7 @@ public sealed class MultiTenantAuthMiddleware
         // --- Format validation ---
         if (!TenantFormatValidator.IsValid(tenant.TenantId, _options))
         {
-            _logger.LogInformation("Tenant id failed format validation.");
+            _logger.LogWarning("Tenant id failed format validation.");
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
             return;
         }
@@ -94,7 +94,7 @@ public sealed class MultiTenantAuthMiddleware
         if (tenant.TenantSlug is not null
             && !TenantFormatValidator.IsValidSlug(tenant.TenantSlug, _options))
         {
-            _logger.LogInformation("Tenant slug failed format validation.");
+            _logger.LogWarning("Tenant slug failed format validation.");
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
             return;
         }
@@ -109,7 +109,7 @@ public sealed class MultiTenantAuthMiddleware
 
         if (!validationResult.Succeeded)
         {
-            _logger.LogInformation("Tenant validation failed. Reason (internal): {Reason}",
+            _logger.LogWarning("Tenant validation failed. Reason (internal): {Reason}",
                 validationResult.FailureReason);
 
             context.Response.StatusCode =
@@ -131,6 +131,9 @@ public sealed class MultiTenantAuthMiddleware
         HttpContext context,
         IServiceProvider serviceProvider)
     {
+        if (_options.ResolutionOrder is not { Length: > 0 })
+            return TenantResolutionResult.Fail("ResolutionOrder is empty or null.");
+
         foreach (var strategy in _options.ResolutionOrder)
         {
             var resolver = GetResolver(strategy, serviceProvider);

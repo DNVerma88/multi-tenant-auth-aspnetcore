@@ -31,3 +31,4 @@ C:\GitRepos\multi-tenant-auth-aspnetcore\samples\ApiOnlySample\obj\Release\net8.
 C:\GitRepos\multi-tenant-auth-aspnetcore\samples\ApiOnlySample\obj\Release\net8.0\ApiOnlySample.pdb
 C:\GitRepos\multi-tenant-auth-aspnetcore\samples\ApiOnlySample\obj\Release\net8.0\ApiOnlySample.genruntimeconfig.cache
 C:\GitRepos\multi-tenant-auth-aspnetcore\samples\ApiOnlySample\obj\Release\net8.0\ref\ApiOnlySample.dll
+C:\GitRepos\multi-tenant-auth-aspnetcore\samples\ApiOnlySample\obj\Release\net8.0\ApiOnlySample.sourcelink.json

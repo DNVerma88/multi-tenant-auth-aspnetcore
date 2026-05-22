@@ -24,11 +24,13 @@ internal sealed class RouteValueTenantResolver : ITenantResolver
 
         var routeKey = _options.TenantRouteValueName;
         if (!context.Request.RouteValues.TryGetValue(routeKey, out var raw)
-            || raw is not string tenantId
-            || string.IsNullOrWhiteSpace(tenantId))
+            || raw is not string rawTenantId
+            || string.IsNullOrWhiteSpace(rawTenantId))
         {
             return new(TenantResolutionResult.Fail("Tenant route value not present."));
         }
+
+        var tenantId = rawTenantId.Trim();
 
         var tenant = new TenantContext
         {

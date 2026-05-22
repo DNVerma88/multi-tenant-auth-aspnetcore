@@ -31,3 +31,4 @@ C:\GitRepos\multi-tenant-auth-aspnetcore\samples\SubdomainTenantSample\obj\Relea
 C:\GitRepos\multi-tenant-auth-aspnetcore\samples\SubdomainTenantSample\obj\Release\net8.0\SubdomainTenantSample.pdb
 C:\GitRepos\multi-tenant-auth-aspnetcore\samples\SubdomainTenantSample\obj\Release\net8.0\SubdomainTenantSample.genruntimeconfig.cache
 C:\GitRepos\multi-tenant-auth-aspnetcore\samples\SubdomainTenantSample\obj\Release\net8.0\ref\SubdomainTenantSample.dll
+C:\GitRepos\multi-tenant-auth-aspnetcore\samples\SubdomainTenantSample\obj\Release\net8.0\SubdomainTenantSample.sourcelink.json

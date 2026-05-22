@@ -370,6 +370,64 @@ public class MultiTenantAuthMiddlewareTests
         var resp2 = await client.SendAsync(r2);
         Assert.Equal(HttpStatusCode.BadRequest, resp2.StatusCode);
     }
+
+    // -----------------------------------------------------------------------
+    // Whitespace trimming in resolvers
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task Request_HeaderWithWhitespacePadding_TrimmedAndResolved()
+    {
+        var client = Client(
+            configure: o => o.ResolutionOrder = [TenantResolutionStrategy.Header],
+            authenticated: true,
+            tenantClaim: "acme");
+
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/no-route");
+        request.Headers.TryAddWithoutValidation("X-Tenant-Id", "  acme  ");
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("acme", await response.Content.ReadAsStringAsync());
+    }
+
+    // -----------------------------------------------------------------------
+    // ResolutionOrder null / empty guard
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task Request_ResolutionOrderNull_Returns400()
+    {
+        var client = Client(
+            configure: o =>
+            {
+                o.ResolutionOrder = null!;
+                o.RequireResolvedTenant = true;
+            },
+            authenticated: true,
+            tenantClaim: "acme");
+
+        var response = await client.GetAsync("/api/no-route");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Request_ResolutionOrderEmpty_Returns400()
+    {
+        var client = Client(
+            configure: o =>
+            {
+                o.ResolutionOrder = [];
+                o.RequireResolvedTenant = true;
+            },
+            authenticated: true,
+            tenantClaim: "acme");
+
+        var response = await client.GetAsync("/api/no-route");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
 }
 
 // ---------------------------------------------------------------------------

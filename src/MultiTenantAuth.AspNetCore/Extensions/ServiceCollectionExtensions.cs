@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using MultiTenantAuth.AspNetCore.Abstractions;
 using MultiTenantAuth.AspNetCore.Internal;
 using MultiTenantAuth.AspNetCore.Options;
@@ -31,6 +32,11 @@ public static class ServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(configure);
 
         services.Configure(configure);
+
+        // Validate options at startup — fail fast on misconfiguration.
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<
+            IValidateOptions<MultiTenantAuthOptions>,
+            MultiTenantAuthOptionsValidator>());
 
         // Register the accessor as singleton; AsyncLocal gives per-request isolation.
         services.TryAddSingleton<ITenantContextAccessor, TenantContextAccessor>();

@@ -31,3 +31,4 @@ C:\GitRepos\multi-tenant-auth-aspnetcore\samples\MinimalApiSample\obj\Release\ne
 C:\GitRepos\multi-tenant-auth-aspnetcore\samples\MinimalApiSample\obj\Release\net8.0\MinimalApiSample.pdb
 C:\GitRepos\multi-tenant-auth-aspnetcore\samples\MinimalApiSample\obj\Release\net8.0\MinimalApiSample.genruntimeconfig.cache
 C:\GitRepos\multi-tenant-auth-aspnetcore\samples\MinimalApiSample\obj\Release\net8.0\ref\MinimalApiSample.dll
+C:\GitRepos\multi-tenant-auth-aspnetcore\samples\MinimalApiSample\obj\Release\net8.0\MinimalApiSample.sourcelink.json

@@ -342,6 +342,13 @@
             Register the type in DI before calling <c>AddMultiTenantAuth</c>.
             </summary>
         </member>
+        <member name="T:MultiTenantAuth.AspNetCore.Options.MultiTenantAuthOptionsValidator">
+            <summary>
+            Validates <see cref="T:MultiTenantAuth.AspNetCore.Options.MultiTenantAuthOptions"/> at application startup so that
+            misconfigurations cause an immediate, descriptive error rather than a silent
+            runtime failure during request processing.
+            </summary>
+        </member>
         <member name="T:MultiTenantAuth.AspNetCore.Options.TenantResolutionStrategy">
             <summary>
             Defines the available strategies for resolving a tenant from an HTTP request.

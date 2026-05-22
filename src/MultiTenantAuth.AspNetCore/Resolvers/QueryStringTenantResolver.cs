@@ -36,7 +36,7 @@ internal sealed class QueryStringTenantResolver : ITenantResolver
             return new(TenantResolutionResult.Fail("Tenant query-string parameter not present."));
         }
 
-        var tenantId = values[0];
+        var tenantId = values[0]?.Trim();
         if (string.IsNullOrWhiteSpace(tenantId))
             return new(TenantResolutionResult.Fail("Tenant query-string parameter is empty."));
 
