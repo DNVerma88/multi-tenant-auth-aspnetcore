@@ -12,41 +12,66 @@ on:
         required: true
         type: string
 
-# Workflow-level default: least-privilege read-only.
-# Each job escalates only what it needs.
-permissions:
-  contents: read
-
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_NOLOGO: true
+
+permissions:
+  contents: write        # Create GitHub Release, push git tag
+  id-token: write        # Request OIDC JWT for NuGet trusted publishing
 
 jobs:
-  # ─────────────────────────────────────────────────────────────
-  # JOB 1: build, test, and produce the NuGet packages
-  # ─────────────────────────────────────────────────────────────
-  pack:
-    name: Pack NuGet
+  release:
+    name: Release
     runs-on: ubuntu-latest
-    permissions:
-      contents: read  # checkout only
-    outputs:
-      release-version: ${{ steps.version.outputs.value }}
+
+    environment:
+      name: nuget-publish   # GitHub Environment — use for required reviewers / approval gate
 
     steps:
       - name: Checkout
-        # actions/checkout@v4 — pinned to commit SHA for supply-chain safety
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0  # Required for SourceLink
 
       - name: Setup .NET (8 + 10)
-        # Both SDKs are required: net8.0 and net10.0 are both target frameworks.
-        # actions/setup-dotnet@v4 — pinned to commit SHA
-        uses: actions/setup-dotnet@3e891b0cb619bf60e2c25674b222b8940e2c1c25  # v4.1.0
+        uses: actions/setup-dotnet@v4
         with:
           dotnet-version: |
-            8.0.x
-            10.0.x
+            8.x
+            10.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Extract version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "value=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+            echo "tag=v${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            # Strip the leading 'v' from the pushed tag (e.g. v1.1.0 → 1.1.0)
+            echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create and push tag (workflow_dispatch only)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Delete existing tag if it already exists so re-runs are idempotent
+          git tag -d "${{ steps.version.outputs.tag }}" 2>/dev/null || true
+          git push origin --delete "${{ steps.version.outputs.tag }}" 2>/dev/null || true
+          git tag -a "${{ steps.version.outputs.tag }}" -m "Release ${{ steps.version.outputs.tag }}"
+          git push origin "${{ steps.version.outputs.tag }}"
 
       - name: Restore
         run: dotnet restore
@@ -55,7 +80,7 @@ jobs:
         run: dotnet build --no-restore -c Release
 
       - name: Test
-        run: dotnet test --no-build -c Release
+        run: dotnet test --no-build -c Release --verbosity normal
 
       - name: Vulnerability scan
         run: |
@@ -65,129 +90,46 @@ jobs:
             exit 1
           fi
 
-      - name: Resolve release version
-        id: version
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "value=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
-          else
-            # Strip the leading 'v' from the pushed tag (e.g. v1.1.0 → 1.1.0)
-            echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Pack
         run: |
           dotnet pack src/MultiTenantAuth.AspNetCore/MultiTenantAuth.AspNetCore.csproj \
             --no-restore -c Release -o ./artifacts \
             -p:Version=${{ steps.version.outputs.value }}
 
-      - name: Upload NuGet artifacts
-        # actions/upload-artifact@v4 — pinned to commit SHA
-        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08  # v4.6.0
+      # ── NuGet Trusted Publishing (OIDC) ───────────────────────
+      # Configure a "GitHub Actions" trusted publisher on nuget.org first:
+      #   https://www.nuget.org/account/packages → Manage → Trusted publishers
+      # Set: owner=DNVerma88, repo=multi-tenant-auth-aspnetcore,
+      #      workflow=cd.yml, environment=nuget-publish
+      - name: NuGet login (Trusted Publishing)
+        uses: NuGet/login@v1
+        id: nuget-login
         with:
-          name: nuget-packages
-          # Include both .nupkg (package) and .snupkg (symbols)
-          path: |
-            ./artifacts/*.nupkg
-            ./artifacts/*.snupkg
-          if-no-files-found: error
+          user: DNVerma88
 
-  # ─────────────────────────────────────────────────────────────
-  # JOB 2: exchange a short-lived OIDC token for a NuGet API key,
-  #        push to NuGet.org, and create a GitHub Release.
-  #
-  # NuGet.org Trusted Publishing (OIDC) avoids storing a long-lived
-  # NUGET_API_KEY secret.  Configure a "GitHub Actions" trusted
-  # publisher on your NuGet.org package page first:
-  #   https://www.nuget.org/account/packages → Manage → Trusted publishers
-  # Set: owner=DNVerma88, repo=multi-tenant-auth-aspnetcore,
-  #      workflow=cd.yml, environment=nuget-publish
-  # ─────────────────────────────────────────────────────────────
-  publish:
-    name: Publish to NuGet (OIDC)
-    runs-on: ubuntu-latest
-    needs: pack
-    permissions:
-      contents: write       # Create GitHub Release + upload assets
-      id-token: write       # Request OIDC JWT from GitHub for NuGet trusted publishing
-
-    environment:
-      name: nuget-publish   # GitHub Environment — use for required reviewers / approval gate
-
-    steps:
-      - name: Download NuGet artifacts
-        # actions/download-artifact@v4 — pinned to commit SHA
-        uses: actions/download-artifact@fa0a91b85d4f404e444306234f46c1cfd67b4085  # v4.1.8
-        with:
-          name: nuget-packages
-          path: ./artifacts
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@3e891b0cb619bf60e2c25674b222b8940e2c1c25  # v4.1.0
-        with:
-          dotnet-version: "8.0.x"
-
-      # ── OIDC token exchange ────────────────────────────────────
-      # GitHub's OIDC provider issues a short-lived JWT.
-      # NuGet.org Trusted Publishing validates it against the
-      # registered owner / repo / workflow / environment and returns
-      # a scoped API key valid for ~1 hour.
-      # Implemented inline (no third-party action dependency):
-      #   https://learn.microsoft.com/nuget/nuget-org/publish-a-package#publish-with-github-actions
-      - name: Obtain temporary NuGet API key via OIDC
-        id: nuget-oidc
-        run: |
-          # 1. Request the OIDC token from GitHub (audience = nuget.org)
-          OIDC_TOKEN=$(curl -s \
-            -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
-            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=nuget.org" \
-            | jq -r '.value')
-
-          if [ -z "$OIDC_TOKEN" ] || [ "$OIDC_TOKEN" = "null" ]; then
-            echo "::error::Failed to obtain OIDC token from GitHub."
-            exit 1
-          fi
-
-          # 2. Exchange the OIDC token for a temporary NuGet API key
-          API_KEY=$(curl -s -X POST \
-            -H "Content-Type: application/json" \
-            -d "{\"identityToken\": \"${OIDC_TOKEN}\"}" \
-            "https://www.nuget.org/api/v1/authorize-oidc" \
-            | jq -r '.result')
-
-          if [ -z "$API_KEY" ] || [ "$API_KEY" = "null" ]; then
-            echo "::error::NuGet OIDC token exchange failed. Ensure Trusted Publishing is configured on nuget.org."
-            exit 1
-          fi
-
-          # Mask the key so it never appears in logs
-          echo "::add-mask::${API_KEY}"
-          echo "api-key=${API_KEY}" >> "$GITHUB_OUTPUT"
-
-      # ── Publish ───────────────────────────────────────────────
       - name: Push packages to NuGet.org
         run: |
-          # Push .nupkg first, then .snupkg (symbols).
-          # --skip-duplicate makes re-runs idempotent.
-          dotnet nuget push "artifacts/*.nupkg" \
-            --api-key "${{ steps.nuget-oidc.outputs.api-key }}" \
-            --source https://api.nuget.org/v3/index.json \
+          dotnet nuget push "./artifacts/*.nupkg" \
+            --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" \
+            --source "https://api.nuget.org/v3/index.json" \
             --skip-duplicate
-          dotnet nuget push "artifacts/*.snupkg" \
-            --api-key "${{ steps.nuget-oidc.outputs.api-key }}" \
-            --source https://api.nuget.org/v3/index.json \
-            --skip-duplicate
+          if ls ./artifacts/*.snupkg 1>/dev/null 2>&1; then
+            dotnet nuget push "./artifacts/*.snupkg" \
+              --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" \
+              --source "https://api.nuget.org/v3/index.json" \
+              --skip-duplicate
+          fi
 
-      # ── GitHub Release ────────────────────────────────────────
       - name: Create GitHub Release
-        # softprops/action-gh-release — pinned to commit SHA
-        uses: softprops/action-gh-release@c062e08bd532815e2082a85e87e3ef29c3e6d191  # v2.2.1
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ needs.pack.outputs.release-version }}
+          tag_name: ${{ steps.version.outputs.tag }}
           files: |
-            artifacts/*.nupkg
-            artifacts/*.snupkg
+            ./artifacts/*.nupkg
+            ./artifacts/*.snupkg
           generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.tag, '-') }}
           body: |
             ## Installation
 
