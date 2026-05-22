@@ -1,9 +1,16 @@
 name: CD
 
-# Triggered on semver tags (e.g. v1.1.0)
+# Triggered automatically on semver tag pushes (e.g. v1.1.0)
+# or manually via "Run workflow" with an explicit version input.
 on:
   push:
     tags: [ "v*" ]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version — semver without the 'v' prefix (e.g. 1.1.0)"
+        required: true
+        type: string
 
 # Workflow-level default: least-privilege read-only.
 # Each job escalates only what it needs.
@@ -22,6 +29,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read  # checkout only
+    outputs:
+      release-version: ${{ steps.version.outputs.value }}
 
     steps:
       - name: Checkout
@@ -56,10 +65,21 @@ jobs:
             exit 1
           fi
 
+      - name: Resolve release version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "value=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            # Strip the leading 'v' from the pushed tag (e.g. v1.1.0 → 1.1.0)
+            echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Pack
         run: |
           dotnet pack src/MultiTenantAuth.AspNetCore/MultiTenantAuth.AspNetCore.csproj \
-            --no-restore -c Release -o ./artifacts
+            --no-restore -c Release -o ./artifacts \
+            -p:Version=${{ steps.version.outputs.value }}
 
       - name: Upload NuGet artifacts
         # actions/upload-artifact@v4 — pinned to commit SHA
@@ -163,6 +183,7 @@ jobs:
         # softprops/action-gh-release — pinned to commit SHA
         uses: softprops/action-gh-release@c062e08bd532815e2082a85e87e3ef29c3e6d191  # v2.2.1
         with:
+          tag_name: v${{ needs.pack.outputs.release-version }}
           files: |
             artifacts/*.nupkg
             artifacts/*.snupkg
