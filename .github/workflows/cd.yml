@@ -1,19 +1,27 @@
 name: CD
 
+# Triggered on semver tags (e.g. v1.1.0)
 on:
   push:
     tags: [ "v*" ]
 
+# Workflow-level default: least-privilege read-only.
+# Each job escalates only what it needs.
 permissions:
-  contents: read   # Default: read-only; write granted only to publish job
+  contents: read
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  # ─────────────────────────────────────────────────────────────
+  # JOB 1: build, test, and produce the NuGet packages
+  # ─────────────────────────────────────────────────────────────
   pack:
     name: Pack NuGet
     runs-on: ubuntu-latest
+    permissions:
+      contents: read  # checkout only
 
     steps:
       - name: Checkout
@@ -44,20 +52,36 @@ jobs:
           fi
 
       - name: Pack
-        run: dotnet pack src/MultiTenantAuth.AspNetCore/MultiTenantAuth.AspNetCore.csproj --no-restore -c Release -o ./artifacts
+        run: dotnet pack src/MultiTenantAuth.AspNetCore/MultiTenantAuth.AspNetCore.csproj \
+               --no-restore -c Release -o ./artifacts
 
       - name: Upload NuGet artifacts
         uses: actions/upload-artifact@v4
         with:
           name: nuget-packages
           path: ./artifacts/*.nupkg
+          if-no-files-found: error
 
+  # ─────────────────────────────────────────────────────────────
+  # JOB 2: exchange a short-lived OIDC token for a NuGet API key,
+  #        push to NuGet.org, and create a GitHub Release.
+  #
+  # NuGet.org Trusted Publishing (OIDC) avoids storing a long-lived
+  # NUGET_API_KEY secret.  Configure a "GitHub Actions" trusted
+  # publisher on your NuGet.org package page first:
+  #   https://www.nuget.org/account/packages → Manage → Trusted publishers
+  # ─────────────────────────────────────────────────────────────
   publish:
-    name: Publish to NuGet
+    name: Publish to NuGet (OIDC)
     runs-on: ubuntu-latest
     needs: pack
     permissions:
-      contents: write   # Required for softprops/action-gh-release to create a release
+      contents: write       # Create GitHub Release + upload assets
+      id-token: write       # Request OIDC JWT from GitHub for NuGet trusted publishing
+      packages: write       # GitHub Packages (fallback / future use)
+
+    environment:
+      name: nuget-publish   # Optional: use a GitHub Environment for approval gates
 
     steps:
       - name: Download NuGet artifacts
@@ -71,15 +95,39 @@ jobs:
         with:
           dotnet-version: "8.0.x"
 
+      # ── OIDC token exchange ────────────────────────────────────
+      # GitHub's OIDC provider issues a short-lived JWT.
+      # NuGet.org Trusted Publishing validates it against the
+      # registered owner / repo / workflow / environment, then
+      # returns a temporary API key scoped only to push.
+      - name: Obtain temporary NuGet API key via OIDC
+        id: nuget-oidc
+        uses: nicowillis/nuget-oidc-action@v1
+        # Inputs are read from the workflow environment; the action
+        # requests the OIDC token (id-token: write) and exchanges it
+        # against https://www.nuget.org/api/v1/authorize-oidc
+        # Output: steps.nuget-oidc.outputs.api-key  (masked, ~1 h TTL)
+
+      # ── Publish ───────────────────────────────────────────────
       - name: Push to NuGet.org
         run: |
           dotnet nuget push "artifacts/**/*.nupkg" \
-            --api-key ${{ secrets.NUGET_API_KEY }} \
+            --api-key "${{ steps.nuget-oidc.outputs.api-key }}" \
             --source https://api.nuget.org/v3/index.json \
             --skip-duplicate
 
+      # ── GitHub Release ────────────────────────────────────────
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/*.nupkg
+          files: |
+            artifacts/*.nupkg
           generate_release_notes: true
+          body: |
+            ## Installation
+
+            ```
+            dotnet add package MultiTenantAuth.AspNetCore
+            ```
+
+            See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for what's new.

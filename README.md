@@ -3,6 +3,7 @@
 [![NuGet](https://img.shields.io/nuget/v/MultiTenantAuth.AspNetCore.svg)](https://www.nuget.org/packages/MultiTenantAuth.AspNetCore)
 [![CI](https://github.com/DNVerma88/multi-tenant-auth-aspnetcore/actions/workflows/ci.yml/badge.svg)](https://github.com/DNVerma88/multi-tenant-auth-aspnetcore/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Changelog](https://img.shields.io/badge/changelog-1.1.0-blue)](CHANGELOG.md)
 
 Lightweight, production-ready **multi-tenant authentication and authorization middleware** for ASP.NET Core.
 
@@ -347,7 +348,18 @@ dotnet nuget push ./artifacts/MultiTenantAuth.AspNetCore.1.0.0.nupkg \
 
 ## Contributing
 
-Contributions are welcome. Open issues and pull requests at [github.com/DNVerma88/multi-tenant-auth-aspnetcore](https://github.com/DNVerma88/multi-tenant-auth-aspnetcore). Please read [SECURITY.md](SECURITY.md) before submitting security-related changes.
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for the full development workflow, coding conventions, and PR process. For security issues, follow [SECURITY.md](SECURITY.md) — do not open public issues.
+
+---
+
+## Community
+
+| Document | Purpose |
+|----------|---------|
+| [CHANGELOG.md](CHANGELOG.md) | Version history and breaking changes |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute |
+| [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | Community standards |
+| [SECURITY.md](SECURITY.md) | Responsible disclosure |
 
 ---
 
