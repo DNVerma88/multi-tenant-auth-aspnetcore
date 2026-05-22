@@ -35,66 +35,72 @@ public class MultiTenantAuthMiddlewareTests
         ITenantResolver? customResolver = null,
         ITenantValidator? customValidator = null)
     {
-        var builder = new WebHostBuilder()
-            .ConfigureServices(services =>
+        var host = new HostBuilder()
+            .ConfigureWebHost(webBuilder =>
             {
-                services.AddRouting();
-                services.AddAuthorization();
-
-                // Fake authentication scheme so tests can opt into auth.
-                services.AddAuthentication("Test")
-                    .AddScheme<AuthenticationSchemeOptions, FakeAuthHandler>("Test", _ => { });
-
-                services.AddSingleton<FakeAuthHandlerOptions>(new FakeAuthHandlerOptions(
-                    authenticated, tenantClaim, allowedTenants));
-
-                if (customResolver is not null)
+                webBuilder.UseTestServer();
+                webBuilder.ConfigureServices(services =>
                 {
-                    // Register by concrete type so the middleware can resolve it via
-                    // CustomResolverType (which looks up by exact type, not ITenantResolver).
-                    services.AddSingleton(customResolver.GetType(), customResolver);
-                }
+                    services.AddRouting();
+                    services.AddAuthorization();
 
-                if (customValidator is not null)
-                    services.AddSingleton<ITenantValidator>(customValidator);
+                    // Fake authentication scheme so tests can opt into auth.
+                    services.AddAuthentication("Test")
+                        .AddScheme<AuthenticationSchemeOptions, FakeAuthHandler>("Test", _ => { });
 
-                services.AddMultiTenantAuth(opt =>
-                {
-                    configure?.Invoke(opt);
+                    services.AddSingleton<FakeAuthHandlerOptions>(new FakeAuthHandlerOptions(
+                        authenticated, tenantClaim, allowedTenants));
+
                     if (customResolver is not null)
                     {
-                        opt.CustomResolverType = customResolver.GetType();
-                        opt.ResolutionOrder = [TenantResolutionStrategy.Custom];
+                        // Register by concrete type so the middleware can resolve it via
+                        // CustomResolverType (which looks up by exact type, not ITenantResolver).
+                        services.AddSingleton(customResolver.GetType(), customResolver);
                     }
+
                     if (customValidator is not null)
-                        opt.CustomValidatorType = customValidator.GetType();
+                        services.AddSingleton<ITenantValidator>(customValidator);
+
+                    services.AddMultiTenantAuth(opt =>
+                    {
+                        configure?.Invoke(opt);
+                        if (customResolver is not null)
+                        {
+                            opt.CustomResolverType = customResolver.GetType();
+                            opt.ResolutionOrder = [TenantResolutionStrategy.Custom];
+                        }
+                        if (customValidator is not null)
+                            opt.CustomValidatorType = customValidator.GetType();
+                    });
+                });
+                webBuilder.Configure(app =>
+                {
+                    app.UseRouting();
+                    app.UseAuthentication();
+                    app.UseMultiTenantAuth();
+                    app.UseAuthorization();
+
+                    app.UseEndpoints(endpoints =>
+                    {
+                        endpoints.MapGet("/api/{tenantId}/data", async ctx =>
+                        {
+                            var accessor = ctx.RequestServices.GetRequiredService<ITenantContextAccessor>();
+                            var tenantId = accessor.Current?.TenantId ?? "none";
+                            await ctx.Response.WriteAsync(tenantId);
+                        });
+
+                        endpoints.MapGet("/api/no-route", async ctx =>
+                        {
+                            var accessor = ctx.RequestServices.GetRequiredService<ITenantContextAccessor>();
+                            await ctx.Response.WriteAsync(accessor.Current?.TenantId ?? "none");
+                        });
+                    });
                 });
             })
-            .Configure(app =>
-            {
-                app.UseRouting();
-                app.UseAuthentication();
-                app.UseMultiTenantAuth();
-                app.UseAuthorization();
+            .Build();
 
-                app.UseEndpoints(endpoints =>
-                {
-                    endpoints.MapGet("/api/{tenantId}/data", async ctx =>
-                    {
-                        var accessor = ctx.RequestServices.GetRequiredService<ITenantContextAccessor>();
-                        var tenantId = accessor.Current?.TenantId ?? "none";
-                        await ctx.Response.WriteAsync(tenantId);
-                    });
-
-                    endpoints.MapGet("/api/no-route", async ctx =>
-                    {
-                        var accessor = ctx.RequestServices.GetRequiredService<ITenantContextAccessor>();
-                        await ctx.Response.WriteAsync(accessor.Current?.TenantId ?? "none");
-                    });
-                });
-            });
-
-        return new TestServer(builder);
+        host.Start();
+        return host.GetTestServer();
     }
 
     private static HttpClient Client(
