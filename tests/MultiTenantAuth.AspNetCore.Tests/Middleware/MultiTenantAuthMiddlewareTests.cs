@@ -49,7 +49,11 @@ public class MultiTenantAuthMiddlewareTests
                     authenticated, tenantClaim, allowedTenants));
 
                 if (customResolver is not null)
-                    services.AddSingleton<ITenantResolver>(customResolver);
+                {
+                    // Register by concrete type so the middleware can resolve it via
+                    // CustomResolverType (which looks up by exact type, not ITenantResolver).
+                    services.AddSingleton(customResolver.GetType(), customResolver);
+                }
 
                 if (customValidator is not null)
                     services.AddSingleton<ITenantValidator>(customValidator);

@@ -193,22 +193,28 @@ public sealed class MultiTenantAuthMiddleware
 
     private ITenantResolver? GetResolver(TenantResolutionStrategy strategy, IServiceProvider sp)
     {
-        return strategy switch
+        switch (strategy)
         {
-            TenantResolutionStrategy.Header =>
-                new HeaderTenantResolver(Microsoft.Extensions.Options.Options.Create(_options)),
-            TenantResolutionStrategy.RouteValue =>
-                new RouteValueTenantResolver(Microsoft.Extensions.Options.Options.Create(_options)),
-            TenantResolutionStrategy.Subdomain =>
-                new SubdomainTenantResolver(Microsoft.Extensions.Options.Options.Create(_options)),
-            TenantResolutionStrategy.Claim =>
-                new ClaimTenantResolver(Microsoft.Extensions.Options.Options.Create(_options)),
-            TenantResolutionStrategy.QueryString =>
-                new QueryStringTenantResolver(Microsoft.Extensions.Options.Options.Create(_options)),
-            TenantResolutionStrategy.Custom =>
-                ResolveCustomResolver(sp),
-            _ => null
-        };
+            case TenantResolutionStrategy.Header:
+                return new HeaderTenantResolver(Microsoft.Extensions.Options.Options.Create(_options));
+            case TenantResolutionStrategy.RouteValue:
+                return new RouteValueTenantResolver(Microsoft.Extensions.Options.Options.Create(_options));
+            case TenantResolutionStrategy.Subdomain:
+                return new SubdomainTenantResolver(Microsoft.Extensions.Options.Options.Create(_options));
+            case TenantResolutionStrategy.Claim:
+                return new ClaimTenantResolver(Microsoft.Extensions.Options.Options.Create(_options));
+            case TenantResolutionStrategy.QueryString:
+                return new QueryStringTenantResolver(Microsoft.Extensions.Options.Options.Create(_options));
+            case TenantResolutionStrategy.Custom:
+                return ResolveCustomResolver(sp);
+            case TenantResolutionStrategy.None:
+                return null;  // Explicit no-op; callers skip null resolvers.
+            default:
+                _logger.LogWarning(
+                    "Unknown TenantResolutionStrategy value {Strategy} in ResolutionOrder — skipping.",
+                    strategy);
+                return null;
+        }
     }
 
     private ITenantResolver? ResolveCustomResolver(IServiceProvider sp)
@@ -216,9 +222,16 @@ public sealed class MultiTenantAuthMiddleware
         if (_options.CustomResolverType is null)
             return null;
 
-        // Try the exact registered type first, then fall back to ITenantResolver.
-        return (sp.GetService(_options.CustomResolverType) as ITenantResolver)
-            ?? sp.GetService<ITenantResolver>();
+        // Resolve only the exact registered type — no silent fallback to a different
+        // ITenantResolver, which could lead to the wrong resolver being invoked.
+        var resolver = sp.GetService(_options.CustomResolverType) as ITenantResolver;
+        if (resolver is null)
+            _logger.LogWarning(
+                "CustomResolverType '{Type}' is not registered in DI. " +
+                "Register it with services.AddSingleton<{TypeShort}>(...).",
+                _options.CustomResolverType.FullName,
+                _options.CustomResolverType.Name);
+        return resolver;
     }
 
     private ITenantValidator GetValidator(IServiceProvider sp)
