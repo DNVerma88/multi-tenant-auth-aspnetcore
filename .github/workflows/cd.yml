@@ -99,13 +99,13 @@ jobs:
       # ── NuGet Trusted Publishing (OIDC) ───────────────────────
       # Configure a "GitHub Actions" trusted publisher on nuget.org first:
       #   https://www.nuget.org/account/packages → Manage → Trusted publishers
-      # Set: owner=DNVerma88, repo=multi-tenant-auth-aspnetcore,
+      # Set: owner=deepn87, repo=multi-tenant-auth-aspnetcore,
       #      workflow=cd.yml, environment=nuget-publish
       - name: NuGet login (Trusted Publishing)
         uses: NuGet/login@v1
         id: nuget-login
         with:
-          user: DNVerma88
+          user: deepn87
 
       - name: Push packages to NuGet.org
         run: |
