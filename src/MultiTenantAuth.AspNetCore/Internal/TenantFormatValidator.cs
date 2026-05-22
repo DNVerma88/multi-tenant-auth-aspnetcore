@@ -26,6 +26,9 @@ internal static class TenantFormatValidator
         if (string.IsNullOrWhiteSpace(value))
             return false;
 
+        if (value.Length < options.MinTenantIdLength)
+            return false;
+
         if (value.Length > options.MaxTenantIdLength)
             return false;
 

@@ -11,7 +11,7 @@ public class TenantFormatValidatorTests
     [InlineData("acme")]
     [InlineData("ACME-corp")]
     [InlineData("tenant_123")]
-    [InlineData("a")]
+    [InlineData("ab")]  // minimum valid length (MinTenantIdLength = 2)
     public void IsValid_ValidIds_ReturnsTrue(string id)
     {
         Assert.True(TenantFormatValidator.IsValid(id, DefaultOpts()));
@@ -34,6 +34,13 @@ public class TenantFormatValidatorTests
     {
         var longId = new string('a', 65);
         Assert.False(TenantFormatValidator.IsValid(longId, DefaultOpts()));
+    }
+
+    [Fact]
+    public void IsValid_BelowMinLength_ReturnsFalse()
+    {
+        // Single-char IDs are rejected by default (MinTenantIdLength = 2).
+        Assert.False(TenantFormatValidator.IsValid("a", DefaultOpts()));
     }
 
     [Fact]

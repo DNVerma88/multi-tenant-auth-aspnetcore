@@ -41,6 +41,29 @@ public sealed class MultiTenantAuthMiddleware
         _next = next;
         _options = options.Value;
         _logger = logger;
+
+        WarnIfInsecureConfiguration();
+    }
+
+    private void WarnIfInsecureConfiguration()
+    {
+        if (!_options.RequireAuthenticatedUser)
+            _logger.LogWarning(
+                "MultiTenantAuth: {Setting} is disabled. All requests will pass " +
+                "through without authentication checks. Do NOT use this in production.",
+                nameof(_options.RequireAuthenticatedUser));
+
+        if (!_options.RequireResolvedTenant)
+            _logger.LogWarning(
+                "MultiTenantAuth: {Setting} is disabled. Requests without a " +
+                "resolvable tenant will proceed. Ensure downstream code handles null tenant context.",
+                nameof(_options.RequireResolvedTenant));
+
+        if (_options.EnableQueryStringResolution)
+            _logger.LogWarning(
+                "MultiTenantAuth: {Setting} is enabled. Query-string tenant values " +
+                "are easily manipulated. Ensure additional protections are in place.",
+                nameof(_options.EnableQueryStringResolution));
     }
 
     /// <summary>Processes the request.</summary>
@@ -83,6 +106,20 @@ public sealed class MultiTenantAuthMiddleware
 
         var tenant = resolutionResult.Tenant;
 
+        // --- Normalise tenant ID to prevent case-confusion attacks ---
+        if (_options.NormalizeTenantIdToLowercase
+            && !string.IsNullOrEmpty(tenant.TenantId)
+            && tenant.TenantId != tenant.TenantId.ToLowerInvariant())
+        {
+            tenant = new TenantContext
+            {
+                TenantId = tenant.TenantId.ToLowerInvariant(),
+                TenantSlug = tenant.TenantSlug?.ToLowerInvariant(),
+                Source = tenant.Source,
+                IsResolved = tenant.IsResolved
+            };
+        }
+
         // --- Format validation ---
         if (!TenantFormatValidator.IsValid(tenant.TenantId, _options))
         {
@@ -102,25 +139,31 @@ public sealed class MultiTenantAuthMiddleware
         // --- Store context ---
         tenantContextAccessor.Current = tenant;
 
-        // --- Validation ---
-        var validator = GetValidator(serviceProvider);
-        var validationResult = await validator.ValidateAsync(
-            tenant, context.User, context, context.RequestAborted);
-
-        if (!validationResult.Succeeded)
+        try
         {
-            _logger.LogWarning("Tenant validation failed. Reason (internal): {Reason}",
-                validationResult.FailureReason);
+            // --- Validation ---
+            var validator = GetValidator(serviceProvider);
+            var validationResult = await validator.ValidateAsync(
+                tenant, context.User, context, context.RequestAborted);
 
-            context.Response.StatusCode =
-                validationResult.StatusCode ?? StatusCodes.Status403Forbidden;
-            return;
+            if (!validationResult.Succeeded)
+            {
+                _logger.LogWarning("Tenant validation failed. Reason (internal): {Reason}",
+                    validationResult.FailureReason);
+
+                context.Response.StatusCode =
+                    validationResult.StatusCode ?? StatusCodes.Status403Forbidden;
+                return;
+            }
+
+            await _next(context);
         }
-
-        await _next(context);
-
-        // Clear context after response to prevent cross-context leakage.
-        tenantContextAccessor.Current = null;
+        finally
+        {
+            // Always clear context — on success, failure, or exception — to prevent
+            // any downstream middleware or error handler from observing a stale tenant.
+            tenantContextAccessor.Current = null;
+        }
     }
 
     // -----------------------------------------------------------------------

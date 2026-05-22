@@ -32,6 +32,8 @@ internal sealed class DefaultTenantValidator : ITenantValidator
     {
         if (_options.RequireAuthenticatedUser && user.Identity?.IsAuthenticated != true)
         {
+            // RFC 7235 §4.1 — 401 responses MUST include a WWW-Authenticate header.
+            context.Response.Headers.WWWAuthenticate = "Bearer";
             return new(TenantValidationResult.Fail(
                 StatusCodes.Status401Unauthorized,
                 "User is not authenticated."));

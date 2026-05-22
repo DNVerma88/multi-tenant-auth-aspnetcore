@@ -54,19 +54,16 @@ public class SubdomainTenantResolverTests
     }
 
     [Fact]
-    public async Task ResolveAsync_IpAddress_ResolvesFirstLabel()
+    public async Task ResolveAsync_IpAddress_FailsResolution()
     {
-        // The subdomain resolver extracts the first label from any dotted hostname.
-        // Callers should combine this with format validation to reject numeric labels.
+        // Security fix (VULN-03): IP addresses must be rejected — they have no
+        // meaningful subdomain and "192" extracted as a label would bypass tenant guards.
         var resolver = new SubdomainTenantResolver(Opts());
         var ctx = new DefaultHttpContext();
         ctx.Request.Host = new HostString("192.168.1.1");
 
         var result = await resolver.ResolveAsync(ctx);
 
-        // "192" is extracted as the first label — resolver succeeds;
-        // format validation in middleware would later accept or reject it.
-        Assert.True(result.Succeeded);
-        Assert.Equal("192", result.Tenant!.TenantId);
+        Assert.False(result.Succeeded);
     }
 }

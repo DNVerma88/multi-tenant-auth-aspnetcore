@@ -110,11 +110,22 @@ public sealed class MultiTenantAuthOptions
     // Tenant id format validation
     // -----------------------------------------------------------------------
 
+    /// <summary>Minimum length of a tenant identifier. Default: 2.</summary>
+    public int MinTenantIdLength { get; set; } = TenantConstants.DefaultMinTenantIdLength;
+
     /// <summary>Maximum length of a tenant identifier. Default: 64.</summary>
     public int MaxTenantIdLength { get; set; } = TenantConstants.DefaultMaxTenantIdLength;
 
     /// <summary>Maximum length of a tenant slug. Default: 100.</summary>
     public int MaxTenantSlugLength { get; set; } = TenantConstants.DefaultMaxTenantSlugLength;
+
+    /// <summary>
+    /// When true, resolved tenant identifiers are normalised to lowercase before
+    /// being stored in <see cref="Models.TenantContext.TenantId"/>. This prevents
+    /// case-confusion attacks where "ACME" and "acme" are treated as different
+    /// tenants by case-sensitive downstream systems. Default: true.
+    /// </summary>
+    public bool NormalizeTenantIdToLowercase { get; set; } = true;
 
     /// <summary>
     /// Regex pattern that a tenant identifier must match.
