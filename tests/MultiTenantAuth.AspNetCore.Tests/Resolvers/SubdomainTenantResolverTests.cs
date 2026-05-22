@@ -66,4 +66,29 @@ public class SubdomainTenantResolverTests
 
         Assert.False(result.Succeeded);
     }
+
+    [Fact]
+    public async Task ResolveAsync_IPv6Address_FailsResolution()
+    {
+        // HostString.Host for "[::1]" returns "::1" which IPAddress.TryParse handles.
+        var resolver = new SubdomainTenantResolver(Opts());
+        var ctx = new DefaultHttpContext();
+        ctx.Request.Host = new HostString("[::1]");
+
+        var result = await resolver.ResolveAsync(ctx);
+
+        Assert.False(result.Succeeded);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_EmptyHost_ReturnsFail()
+    {
+        var resolver = new SubdomainTenantResolver(Opts());
+        var ctx = new DefaultHttpContext();
+        // DefaultHttpContext.Request.Host is empty by default.
+
+        var result = await resolver.ResolveAsync(ctx);
+
+        Assert.False(result.Succeeded);
+    }
 }

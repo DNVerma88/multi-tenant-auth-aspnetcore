@@ -54,12 +54,7 @@ internal sealed class DefaultTenantValidator : ITenantValidator
 
     private bool UserBelongsToTenant(ClaimsPrincipal user, string tenantId)
     {
-        // Check primary tenant claim.
-        var primaryClaim = user.FindFirstValue(_options.TenantClaimType);
-        if (string.Equals(primaryClaim, tenantId, StringComparison.OrdinalIgnoreCase))
-            return true;
-
-        // Check all values of the primary claim (multiple identical claim types).
+        // Check all values of the primary tenant claim (handles both single and multiple claims).
         foreach (var claim in user.FindAll(_options.TenantClaimType))
         {
             if (string.Equals(claim.Value, tenantId, StringComparison.OrdinalIgnoreCase))

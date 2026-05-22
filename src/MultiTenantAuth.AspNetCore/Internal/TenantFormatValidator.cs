@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using MultiTenantAuth.AspNetCore.Constants;
 using MultiTenantAuth.AspNetCore.Options;
 
 namespace MultiTenantAuth.AspNetCore.Internal;
@@ -10,13 +11,11 @@ namespace MultiTenantAuth.AspNetCore.Internal;
 internal static class TenantFormatValidator
 {
     // Compiled static regex for performance on the hot path.
-    // Recompiled only if the pattern changes from the default.
+    // Uses TenantConstants.DefaultAllowedTenantPattern as the single source of truth.
     private static readonly Regex _defaultPattern = new(
-        MultiTenantAuthOptions_DefaultPattern,
+        TenantConstants.DefaultAllowedTenantPattern,
         RegexOptions.Compiled | RegexOptions.CultureInvariant,
         TimeSpan.FromMilliseconds(50));
-
-    private const string MultiTenantAuthOptions_DefaultPattern = @"^[a-zA-Z0-9\-_]+$";
 
     /// <summary>
     /// Returns true when <paramref name="value"/> is a well-formed tenant id.
@@ -43,6 +42,9 @@ internal static class TenantFormatValidator
         if (string.IsNullOrWhiteSpace(value))
             return false;
 
+        if (value.Length < options.MinTenantIdLength)
+            return false;
+
         if (value.Length > options.MaxTenantSlugLength)
             return false;
 
@@ -54,7 +56,7 @@ internal static class TenantFormatValidator
         if (pattern is null)
             return true;
 
-        if (pattern == MultiTenantAuthOptions_DefaultPattern)
+        if (pattern == TenantConstants.DefaultAllowedTenantPattern)
             return _defaultPattern.IsMatch(value);
 
         // Custom pattern – create a one-off Regex with a timeout to prevent ReDoS.

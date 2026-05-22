@@ -71,4 +71,22 @@ public class TenantFormatValidatorTests
         var slug = new string('a', 101);
         Assert.False(TenantFormatValidator.IsValidSlug(slug, DefaultOpts()));
     }
+
+    [Fact]
+    public void IsValidSlug_BelowMinLength_ReturnsFalse()
+    {
+        // Single-char slugs are rejected (MinTenantIdLength = 2 applies to slugs too).
+        Assert.False(TenantFormatValidator.IsValidSlug("a", DefaultOpts()));
+    }
+
+    [Fact]
+    public void IsValid_CustomPattern_MatchesCustomRule()
+    {
+        // Exercises the non-default regex path in MatchesPattern.
+        var opts = DefaultOpts();
+        opts.AllowedTenantPattern = @"^[a-z]+$";  // lowercase only
+
+        Assert.True(TenantFormatValidator.IsValid("acme", opts));
+        Assert.False(TenantFormatValidator.IsValid("ACME", opts));
+    }
 }

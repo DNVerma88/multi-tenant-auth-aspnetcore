@@ -31,7 +31,7 @@ By participating you agree to abide by its terms.
 
 | Tool | Minimum version |
 |------|----------------|
-| [.NET SDK](https://dot.net) | 8.0 |
+| [.NET SDK](https://dot.net) | 8.0 (tests); 10.0 (full library build including `net10.0` TFM) |
 | [Git](https://git-scm.com/) | 2.x |
 | [GitHub CLI](https://cli.github.com/) *(optional)* | 2.x |
 
@@ -53,7 +53,7 @@ dotnet build -c Release
 dotnet test -c Release
 ```
 
-All 78 tests should pass on a clean checkout.
+All **101** tests should pass on a clean checkout.
 
 ---
 

@@ -36,6 +36,9 @@ internal sealed class MultiTenantAuthOptionsValidator : IValidateOptions<MultiTe
         if (string.IsNullOrWhiteSpace(options.TenantClaimType))
             failures.Add($"{nameof(options.TenantClaimType)} must not be null or whitespace.");
 
+        if (string.IsNullOrWhiteSpace(options.TenantQueryStringName))
+            failures.Add($"{nameof(options.TenantQueryStringName)} must not be null or whitespace.");
+
         if (string.IsNullOrWhiteSpace(options.AllowedTenantsClaimType))
             failures.Add($"{nameof(options.AllowedTenantsClaimType)} must not be null or whitespace.");
 

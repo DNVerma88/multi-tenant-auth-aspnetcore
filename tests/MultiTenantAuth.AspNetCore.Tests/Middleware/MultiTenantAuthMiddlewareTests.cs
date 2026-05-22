@@ -428,6 +428,76 @@ public class MultiTenantAuthMiddlewareTests
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
+
+    // -----------------------------------------------------------------------
+    // Tenant ID normalisation (VULN-08)
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task Request_UppercaseTenantId_NormalizedToLowercase()
+    {
+        // NormalizeTenantIdToLowercase defaults to true.
+        // Header sends "ACME"; claim is "acme" — case-insensitive match allows auth.
+        // The stored TenantId in context must be "acme" (lowercased).
+        var client = Client(
+            configure: o => o.ResolutionOrder = [TenantResolutionStrategy.Header],
+            authenticated: true,
+            tenantClaim: "acme");
+
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/no-route");
+        request.Headers.Add("X-Tenant-Id", "ACME");
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("acme", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task Request_NormalizationDisabled_PreservesOriginalCase()
+    {
+        var client = Client(
+            configure: o =>
+            {
+                o.ResolutionOrder = [TenantResolutionStrategy.Header];
+                o.NormalizeTenantIdToLowercase = false;
+            },
+            authenticated: true,
+            tenantClaim: "ACME");
+
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/no-route");
+        request.Headers.Add("X-Tenant-Id", "ACME");
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("ACME", await response.Content.ReadAsStringAsync());
+    }
+
+    // -----------------------------------------------------------------------
+    // WWW-Authenticate header on 401 (VULN-04)
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task Request_Unauthenticated_Returns401_WithWwwAuthenticateHeader()
+    {
+        var client = Client(
+            configure: o =>
+            {
+                o.ResolutionOrder = [TenantResolutionStrategy.Header];
+                o.RequireAuthenticatedUser = true;
+            },
+            authenticated: false);
+
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/no-route");
+        request.Headers.Add("X-Tenant-Id", "acme");
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.True(
+            response.Headers.WwwAuthenticate.Any(),
+            "401 response must include a WWW-Authenticate header (RFC 7235 §4.1).");
+        Assert.Contains("Bearer", response.Headers.WwwAuthenticate.ToString(),
+            StringComparison.OrdinalIgnoreCase);
+    }
 }
 
 // ---------------------------------------------------------------------------
